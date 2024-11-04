@@ -7,10 +7,12 @@ import com.example.layered.repository.MemoRepository;
 import org.springframework.aop.ThrowsAdvice;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class MemoServiceImpl implements MemoService {
@@ -28,9 +30,7 @@ public class MemoServiceImpl implements MemoService {
         Memo memo = new Memo(dto.getTitle(), dto.getContents());
 
         //DB에 저장
-        Memo savedMemo = repository.saveMemo(memo);
-
-        return new MemoResponseDto(savedMemo);
+        return repository.saveMemo(memo);
     }
 
     @Override
@@ -40,59 +40,55 @@ public class MemoServiceImpl implements MemoService {
 
     @Override
     public MemoResponseDto findMemoById(Long id) {
-
-        Memo memoById = repository.findMemoById(id);
-
-        if (memoById == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Does no exist id = " + id);
-        }
-        return new MemoResponseDto(memoById);
+        Memo memo =repository.findMemoByIdOrElseThrow(id);
+        return new MemoResponseDto(memo);
     }
 
+    @Transactional
     @Override
     public MemoResponseDto updateMemo(Long id, String title, String contents) {
-
-        Memo memoById = repository.findMemoById(id);
-
-        if (memoById == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Does no exist id = " + id);
-        }
 
         if (title == null || contents == null) {
             throw  new ResponseStatusException(HttpStatus.BAD_REQUEST, "");
         }
 
-        memoById.update(title, contents);
+        int updateRow = repository.updateMemo(id, title, contents);
 
-        return new MemoResponseDto(memoById);
-    }
-
-    @Override
-    public MemoResponseDto updateTitle(Long id, String title, String contents) {
-        Memo memoById = repository.findMemoById(id);
-
-        if (memoById == null) {
+        if (updateRow == 0) { //id 값으로 조회된 결과가 없다면
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Does no exist id = " + id);
         }
+
+        Memo memo = repository.findMemoByIdOrElseThrow(id);
+
+        return new MemoResponseDto(memo);
+    }
+
+    @Transactional
+    @Override
+    public MemoResponseDto updateTitle(Long id, String title, String contents) {
 
         if (title == null || contents != null) {
             throw  new ResponseStatusException(HttpStatus.BAD_REQUEST, "");
         }
 
-        memoById.updateTitle(title);
+        int updatedRow = repository.updateTitle(id, title);
 
-        return new MemoResponseDto(memoById);
+        if (updatedRow == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Does no exist id = " + id);
+        }
+
+        Memo memo = repository.findMemoByIdOrElseThrow(id);
+
+        return new MemoResponseDto(memo);
     }
 
     @Override
     public void deleteMemo(Long id) {
 
-        Memo memoById = repository.findMemoById(id);
+        int deletedRow = repository.deleteMemo(id);
 
-        if (memoById == null) {
+        if (deletedRow == 0) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-
-        repository.deleteMemo(id);
     }
 }
